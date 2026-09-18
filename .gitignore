@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Generated reports
+Semester_Result/
+*.xlsx
+*.pdf
+*.png
+*.jpg
+*.jpeg
+
+# Test/cache
+.pytest_cache/
+.coverage
+
+# Environment/secrets
+.env
+.env.*
+*.key
+*.pem
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

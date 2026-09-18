@@ -1,0 +1,152 @@
+{
+  "institution": {
+    "id": "sample_school",
+    "name": "Springfield Model School",
+    "institution_type": "School",
+    "org_levels": ["Class", "Section"],
+    "default_grade_scale_id": "school_standard",
+    "default_rule_set_id": "school_rules"
+  },
+
+  "grade_scales": [
+    {
+      "id": "school_standard",
+      "name": "10-point scale",
+      "bands": [
+        {"min_percentage": 90, "grade": "A+"},
+        {"min_percentage": 80, "grade": "A"},
+        {"min_percentage": 70, "grade": "B+"},
+        {"min_percentage": 60, "grade": "B"},
+        {"min_percentage": 50, "grade": "C"},
+        {"min_percentage": 40, "grade": "D"},
+        {"min_percentage": 0, "grade": "F"}
+      ]
+    }
+  ],
+
+  "rule_sets": [
+    {
+      "id": "school_rules",
+      "institution_id": "sample_school",
+      "grade_scale_id": "school_standard",
+      "pass_percentage": 40,
+      "per_course_pass_percentage": 35,
+      "aggregation": "weighted_percentage",
+      "decimals": 2
+    }
+  ],
+
+  "assessment_schemes": [
+    {
+      "id": "school_fa_sa",
+      "name": "FA/SA scheme",
+      "assessments": [
+        {"name": "FA-1", "max_marks": 25, "weight": 0.10, "order": 1},
+        {"name": "FA-2", "max_marks": 25, "weight": 0.10, "order": 2},
+        {"name": "SA-1", "max_marks": 100, "weight": 0.30, "order": 3},
+        {"name": "SA-2", "max_marks": 100, "weight": 0.50, "order": 4}
+      ]
+    }
+  ],
+
+  "reporting": {
+    "title_template": "{institution} - {term} Result",
+    "chart_title_template": "{student} Course Performance",
+    "include_chart": true,
+    "formats": ["excel", "pdf"]
+  },
+
+  "seed": {
+    "academic_years": [
+      {
+        "id": "AY2025",
+        "name": "Academic Year 2025-26",
+        "start_date": "2025-04-01",
+        "end_date": "2026-03-31"
+      }
+    ],
+
+    "terms": [
+      {
+        "id": "term_1",
+        "year_id": "AY2025",
+        "name": "Term 1",
+        "order": 1
+      }
+    ],
+
+    "org_units": [
+      {"id": "class_6", "level": "Class", "name": "6"},
+      {"id": "sec_a", "level": "Section", "name": "A", "parent_id": "class_6"}
+    ],
+
+    "courses": [
+      {"id": "maths", "name": "Mathematics", "code": "MATH"},
+      {"id": "science", "name": "Science", "code": "SCI"},
+      {"id": "english", "name": "English", "code": "ENG"}
+    ],
+
+    "offerings": [
+      {
+        "id": "maths_a",
+        "year_id": "AY2025",
+        "term_id": "term_1",
+        "org_unit_id": "sec_a",
+        "course_id": "maths",
+        "assessment_scheme_id": "school_fa_sa",
+        "max_marks": 100
+      },
+      {
+        "id": "science_a",
+        "year_id": "AY2025",
+        "term_id": "term_1",
+        "org_unit_id": "sec_a",
+        "course_id": "science",
+        "assessment_scheme_id": "school_fa_sa",
+        "max_marks": 100
+      },
+      {
+        "id": "english_a",
+        "year_id": "AY2025",
+        "term_id": "term_1",
+        "org_unit_id": "sec_a",
+        "course_id": "english",
+        "assessment_scheme_id": "school_fa_sa",
+        "max_marks": 100
+      }
+    ],
+
+    "students": [
+      {"id": "s1", "name": "Aarav Sharma", "roll_no": "6A01"},
+      {"id": "s2", "name": "Bhavna Patel", "roll_no": "6A02"},
+      {"id": "s3", "name": "Rohan Mehta", "roll_no": "6A03"}
+    ],
+
+    "enrollments": [
+      {
+        "id": "e1",
+        "student_id": "s1",
+        "year_id": "AY2025",
+        "term_id": "term_1",
+        "org_unit_id": "sec_a",
+        "course_ids": ["maths_a", "science_a", "english_a"]
+      },
+      {
+        "id": "e2",
+        "student_id": "s2",
+        "year_id": "AY2025",
+        "term_id": "term_1",
+        "org_unit_id": "sec_a",
+        "course_ids": ["maths_a", "science_a", "english_a"]
+      },
+      {
+        "id": "e3",
+        "student_id": "s3",
+        "year_id": "AY2025",
+        "term_id": "term_1",
+        "org_unit_id": "sec_a",
+        "course_ids": ["maths_a", "science_a", "english_a"]
+      }
+    ]
+  }
+}

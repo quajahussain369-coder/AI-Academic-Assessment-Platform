@@ -1,0 +1,146 @@
+{
+  "institution": {
+    "id": "sample_college",
+    "name": "National College of Technology",
+    "institution_type": "College",
+    "org_levels": ["Department", "Program"],
+    "default_grade_scale_id": "college_standard",
+    "default_rule_set_id": "college_rules"
+  },
+
+  "grade_scales": [
+    {
+      "id": "college_standard",
+      "name": "Percentage scale",
+      "bands": [
+        {"min_percentage": 90, "grade": "A+"},
+        {"min_percentage": 80, "grade": "A"},
+        {"min_percentage": 70, "grade": "B+"},
+        {"min_percentage": 60, "grade": "B"},
+        {"min_percentage": 50, "grade": "C"},
+        {"min_percentage": 40, "grade": "D"},
+        {"min_percentage": 0, "grade": "F"}
+      ]
+    }
+  ],
+
+  "rule_sets": [
+    {
+      "id": "college_rules",
+      "institution_id": "sample_college",
+      "grade_scale_id": "college_standard",
+      "pass_percentage": 40,
+      "per_course_pass_percentage": 40,
+      "aggregation": "weighted_percentage",
+      "decimals": 2
+    }
+  ],
+
+  "assessment_schemes": [
+    {
+      "id": "internal_external",
+      "name": "Internal/External scheme",
+      "assessments": [
+        {"name": "Internal", "max_marks": 50, "weight": 0.40, "order": 1},
+        {"name": "External", "max_marks": 100, "weight": 0.60, "order": 2}
+      ]
+    }
+  ],
+
+  "reporting": {
+    "title_template": "{institution} - {term} Result",
+    "chart_title_template": "{student} Course Performance",
+    "include_chart": true,
+    "formats": ["excel", "pdf"]
+  },
+
+  "seed": {
+    "academic_years": [
+      {
+        "id": "CY2025",
+        "name": "Academic Year 2025",
+        "start_date": "2025-06-01",
+        "end_date": "2026-05-31"
+      }
+    ],
+
+    "terms": [
+      {
+        "id": "semester_1",
+        "year_id": "CY2025",
+        "name": "Semester 1",
+        "order": 1
+      }
+    ],
+
+    "org_units": [
+      {"id": "dept_cse", "level": "Department", "name": "CSE"},
+      {
+        "id": "prog_cse",
+        "level": "Program",
+        "name": "B.Tech",
+        "parent_id": "dept_cse"
+      }
+    ],
+
+    "courses": [
+      {"id": "dsa", "name": "Data Structures and Algorithms", "code": "CS201"},
+      {"id": "dbms", "name": "Database Management Systems", "code": "CS202"},
+      {"id": "os", "name": "Operating Systems", "code": "CS203"}
+    ],
+
+    "offerings": [
+      {
+        "id": "dsa_prog",
+        "year_id": "CY2025",
+        "term_id": "semester_1",
+        "org_unit_id": "prog_cse",
+        "course_id": "dsa",
+        "assessment_scheme_id": "internal_external",
+        "max_marks": 100
+      },
+      {
+        "id": "dbms_prog",
+        "year_id": "CY2025",
+        "term_id": "semester_1",
+        "org_unit_id": "prog_cse",
+        "course_id": "dbms",
+        "assessment_scheme_id": "internal_external",
+        "max_marks": 100
+      },
+      {
+        "id": "os_prog",
+        "year_id": "CY2025",
+        "term_id": "semester_1",
+        "org_unit_id": "prog_cse",
+        "course_id": "os",
+        "assessment_scheme_id": "internal_external",
+        "max_marks": 100
+      }
+    ],
+
+    "students": [
+      {"id": "c1", "name": "Meera Iyer", "roll_no": "CSE01"},
+      {"id": "c2", "name": "Karthik Rao", "roll_no": "CSE02"}
+    ],
+
+    "enrollments": [
+      {
+        "id": "ce1",
+        "student_id": "c1",
+        "year_id": "CY2025",
+        "term_id": "semester_1",
+        "org_unit_id": "prog_cse",
+        "course_ids": ["dsa_prog", "dbms_prog", "os_prog"]
+      },
+      {
+        "id": "ce2",
+        "student_id": "c2",
+        "year_id": "CY2025",
+        "term_id": "semester_1",
+        "org_unit_id": "prog_cse",
+        "course_ids": ["dsa_prog", "dbms_prog", "os_prog"]
+      }
+    ]
+  }
+}

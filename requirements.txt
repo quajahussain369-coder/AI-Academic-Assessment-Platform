@@ -1,0 +1,10 @@
+# Runtime dependencies for Student Grade Analyzer V2.
+# Versions shown are the minimums tested in the development environment.
+pandas>=3.0.5
+matplotlib>=3.11.2
+numpy>=2.5.3
+openpyxl>=3.1.5
+reportlab>=5.0.1
+
+# Development / test dependency (required to run the unit tests).
+pytest>=9.1.1
