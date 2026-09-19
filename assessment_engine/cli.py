@@ -4,6 +4,7 @@ Commands
 --------
 - ``init CONFIG``    provision an institution from its configuration file
 - ``marks CONFIG``   record marks for one course offering interactively
+- ``import CONFIG``  bulk import marks from an Excel workbook
 - ``report CONFIG``  generate per-student Excel/PDF reports
 
 Configuration files are the primary way to describe an institution; the
@@ -12,8 +13,9 @@ interactive ``marks`` command is a fallback for data entry only.
 
 import argparse
 import sys
+from pathlib import Path
 
-from assessment_engine import models
+from assessment_engine import importer, models
 from assessment_engine.analyzer import (
     compute_all_results,
     make_context,
@@ -40,6 +42,19 @@ def _build_args():
     marks = subparsers.add_parser("marks", help="Record marks for one course offering")
     marks.add_argument("config_path")
     marks.add_argument("--data", default="data", help="data directory (default: data)")
+
+    import_cmd = subparsers.add_parser("import", help="Bulk import marks from an Excel workbook")
+    import_cmd.add_argument("config_path")
+    import_cmd.add_argument("--file", default=None, help="Excel workbook to import (.xlsx)")
+    import_cmd.add_argument("--template", default=None, help="write a blank import template to this path")
+    import_cmd.add_argument("--offering", default=None, help="course offering id for single-course workbooks")
+    import_cmd.add_argument("--legacy", action="store_true", help="force legacy (V1-style) layout parsing")
+    import_cmd.add_argument(
+        "--skip-invalid", action="store_true", dest="skip_invalid",
+        help="commit only valid records and skip the invalid ones",
+    )
+    import_cmd.add_argument("--yes", action="store_true", help="skip the confirmation prompt")
+    import_cmd.add_argument("--data", default="data", help="data directory (default: data)")
 
     report = subparsers.add_parser("report", help="Generate per-student reports")
     report.add_argument("config_path")
@@ -179,6 +194,86 @@ def cmd_marks(args) -> int:
     return 0
 
 
+def cmd_import(args) -> int:
+    config = load_config(args.config_path)
+    storage = _storage(args.data, config)
+
+    if args.template:
+        path = Path(args.template)
+        workbook = importer.build_template(config, storage, offering_hint=args.offering)
+        workbook.save(path)
+        print(CONSOLE_LINE)
+        print(f"Import template written : {path}")
+        print(CONSOLE_LINE)
+        print(f"Offering sheets         : {len(workbook.sheetnames)}")
+        print("Fill in 'Roll No', 'Student Name' and the mark columns, then")
+        print("run 'import --file' to commit the marks.")
+        return 0
+
+    if not args.file:
+        print("Provide --file WORKBOOK.xlsx (or --template PATH.xlsx).")
+        return 2
+
+    print(f"Validating {args.file} ...")
+    plan = importer.parse_workbook(
+        config,
+        storage,
+        args.file,
+        offering_hint=args.offering,
+        legacy=args.legacy,
+    )
+
+    for note in plan.notes:
+        print(f"  note: {note}")
+
+    if plan.has_errors and not args.skip_invalid:
+        print(CONSOLE_LINE)
+        print(f"Import validation for {config.institution.name} - FAILED")
+        print(CONSOLE_LINE)
+        for error in plan.errors:
+            print(f"  [error] {error.render()}")
+        print()
+        print("No records were committed. Fix the workbook and re-run import.")
+        return 1
+
+    print(CONSOLE_LINE)
+    print(f"Import preview - {config.institution.name}")
+    print(CONSOLE_LINE)
+    print(f"Students to create : {len(plan.new_students)}")
+    print(f"Enrollments        : {len(plan.enrollments)}")
+    print(f"Marks              : {len(plan.marks)}")
+    if plan.has_errors:
+        print(f"Invalid records    : {len(plan.errors)} (skipped with --skip-invalid)")
+        for error in plan.errors:
+            print(f"  [skipped] {error.render()}")
+    print()
+
+    if not args.yes:
+        records = len(plan.marks) + len(plan.new_students)
+        answer = input(f"Commit {records} record(s)? [y/N] ").strip().lower()
+        if answer not in ("y", "yes"):
+            print("Import cancelled. Nothing committed.")
+            return 2
+
+    report = plan.apply(storage, skip_invalid=args.skip_invalid)
+
+    print(CONSOLE_LINE)
+    print(f"Import complete - {config.institution.name}")
+    print(CONSOLE_LINE)
+    print(f"Students created : {report.students_created}")
+    print(
+        f"Enrollments      : {report.enrollments_created} created, "
+        f"{report.enrollments_updated} updated"
+    )
+    print(f"Marks written    : {report.marks_written}")
+    if report.skipped:
+        print(f"Skipped invalid  : {len(report.skipped)}")
+        for error in report.skipped:
+            print(f"  [skipped] {error.render()}")
+    print(f"Data file        : {storage._path(config.institution.id)}")
+    return 0
+
+
 def cmd_report(args) -> int:
     config = load_config(args.config_path)
     storage = _storage(args.data, config)
@@ -233,6 +328,8 @@ def main(argv=None) -> int:
         return cmd_init(args)
     if args.command == "marks":
         return cmd_marks(args)
+    if args.command == "import":
+        return cmd_import(args)
     if args.command == "report":
         return cmd_report(args)
 

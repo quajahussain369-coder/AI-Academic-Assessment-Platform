@@ -4,10 +4,12 @@ Run the program with::
 
     python main_v2_1.py <command> <config_file> [options]
 
-Available commands: init, marks, report
+Available commands: init, marks, import, report
 """
+
+import sys
 
 from assessment_engine.cli import main
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

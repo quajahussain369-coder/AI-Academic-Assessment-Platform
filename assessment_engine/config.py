@@ -132,6 +132,7 @@ def load_config(path) -> models.ConfigBundle:
         rule_sets=rule_sets,
         assessment_schemes=assessment_schemes,
         reporting=reporting,
+        excel=data.get("excel", {}),
         seed=data.get("seed", {}),
     )
 

@@ -232,6 +232,7 @@ class ConfigBundle:
     rule_sets: List[RuleSet] = field(default_factory=list)
     assessment_schemes: List[AssessmentScheme] = field(default_factory=list)
     reporting: Dict[str, Any] = field(default_factory=dict)
+    excel: Dict[str, Any] = field(default_factory=dict)
     seed: Dict[str, Any] = field(default_factory=dict)
 
 
