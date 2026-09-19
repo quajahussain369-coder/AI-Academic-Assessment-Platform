@@ -109,6 +109,9 @@ def load_config(path) -> models.ConfigBundle:
         default_rule_set_id=institution_data.get(
             "default_rule_set_id", "default"
         ),
+        code=institution_data.get("code", ""),
+        status=institution_data.get("status", "active"),
+        organization_id=institution_data.get("organization_id"),
     )
 
     grade_scales = [

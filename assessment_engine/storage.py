@@ -22,6 +22,11 @@ Platform-scoped identities (users) are shared across institutions and
 live in one file at the data directory root::
 
     <data_dir>/users.json
+
+Platform-scoped organizations live in one file at the data directory
+root::
+
+    <data_dir>/organizations.json
 """
 
 import json
@@ -33,6 +38,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from assessment_engine import models
+from assessment_engine.identity import normalize_code
 
 
 # Maps each model class to its section name inside the database file.
@@ -111,6 +117,32 @@ class Storage(ABC):
             f"{type(self).__name__} does not support platform users"
         )
 
+    def save_organization(self, organization) -> None:
+        """Create or update one platform-scoped organization.
+
+        Deliberately non-abstract so existing custom storage subclasses
+        keep working unchanged.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support platform organizations"
+        )
+
+    def load_organization(self, organization_id: str):
+        """Return one platform organization, or None when it does not exist."""
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support platform organizations"
+        )
+
+    def load_all_organizations(self) -> List[Any]:
+        """Return every platform organization, sorted by id.
+
+        Organizations are shared across all institutions, so this is not
+        scoped by institution.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support platform organizations"
+        )
+
 
 # ------------------------------------------------------------
 # Serialization helpers
@@ -123,9 +155,17 @@ def to_dict(record) -> Dict[str, Any]:
 
 
 def from_dict(model, data: Dict[str, Any]):
-    """Rebuild a dataclass record from a dict, coercing field types."""
+    """Rebuild a dataclass record from a dict, coercing field types.
+
+    Fields absent from ``data`` are omitted so the dataclass default is
+    used; only fields that are present are coerced.  This keeps legacy
+    records (which lack newer fields) loading with their defaults instead
+    of being silently coerced to ``None``.
+    """
     values = {}
     for name, expected_type in typing.get_type_hints(model).items():
+        if name not in data:
+            continue
         values[name] = _coerce(expected_type, data.get(name))
     return model(**values)
 
@@ -210,7 +250,9 @@ class JsonStorage(Storage):
         database = self._read(institution_id)
 
         if section == "institution":
-            database["institution"] = to_dict(record)
+            raw = to_dict(record)
+            raw["code"] = normalize_code(raw.get("code", ""))
+            database["institution"] = raw
         else:
             database.setdefault(section, {})[record.id] = to_dict(record)
 
@@ -313,4 +355,47 @@ class JsonStorage(Storage):
         return [
             from_dict(models.User, raw)
             for _, raw in sorted(users.items())
+        ]
+
+    # --------------------------------------------------------
+    # Platform organizations (shared across all institutions)
+    # --------------------------------------------------------
+
+    def _organizations_path(self) -> Path:
+        return self.data_dir / "organizations.json"
+
+    def _read_organizations(self) -> Dict[str, Any]:
+        path = self._organizations_path()
+        if path.exists():
+            try:
+                return json.loads(path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                return {}
+        return {}
+
+    def _write_organizations(self, organizations: Dict[str, Any]) -> None:
+        path = self._organizations_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(organizations, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+    def save_organization(self, organization) -> None:
+        organizations = self._read_organizations()
+        organizations[organization.id] = to_dict(organization)
+        self._write_organizations(organizations)
+
+    def load_organization(self, organization_id: str):
+        organizations = self._read_organizations()
+        raw = organizations.get(organization_id)
+        if not raw:
+            return None
+        return from_dict(models.Organization, raw)
+
+    def load_all_organizations(self) -> List[Any]:
+        organizations = self._read_organizations()
+        return [
+            from_dict(models.Organization, raw)
+            for _, raw in sorted(organizations.items())
         ]
