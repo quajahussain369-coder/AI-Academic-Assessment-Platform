@@ -17,6 +17,11 @@ The file is a dictionary with one section per entity type::
         "student":   {"s1": {...}, "s2": {...}},
         "mark":      {...}
     }
+
+Platform-scoped identities (users) are shared across institutions and
+live in one file at the data directory root::
+
+    <data_dir>/users.json
 """
 
 import json
@@ -42,6 +47,7 @@ ENTITY_SECTIONS = {
     models.CourseOffering: "offering",
     models.Assessment: "assessment",
     models.Mark: "mark",
+    models.Membership: "membership",
 }
 
 
@@ -77,6 +83,32 @@ class Storage(ABC):
         """
         raise NotImplementedError(
             f"{type(self).__name__} does not support listing institutions"
+        )
+
+    def save_user(self, user) -> None:
+        """Create or update one platform-scoped user.
+
+        Deliberately non-abstract so existing custom storage subclasses
+        keep working unchanged.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support platform users"
+        )
+
+    def load_user(self, user_id: str):
+        """Return one platform user, or None when it does not exist."""
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support platform users"
+        )
+
+    def load_all_users(self) -> List[Any]:
+        """Return every platform user, sorted by id.
+
+        Users are shared across all institutions, so this is not scoped
+        by institution.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support platform users"
         )
 
 
@@ -239,3 +271,46 @@ class JsonStorage(Storage):
             if child.is_dir() and (child / "db.json").is_file():
                 institutions.append(child.name)
         return institutions
+
+    # --------------------------------------------------------
+    # Platform users (shared across all institutions)
+    # --------------------------------------------------------
+
+    def _users_path(self) -> Path:
+        return self.data_dir / "users.json"
+
+    def _read_users(self) -> Dict[str, Any]:
+        path = self._users_path()
+        if path.exists():
+            try:
+                return json.loads(path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                return {}
+        return {}
+
+    def _write_users(self, users: Dict[str, Any]) -> None:
+        path = self._users_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(users, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+    def save_user(self, user) -> None:
+        users = self._read_users()
+        users[user.id] = to_dict(user)
+        self._write_users(users)
+
+    def load_user(self, user_id: str):
+        users = self._read_users()
+        raw = users.get(user_id)
+        if not raw:
+            return None
+        return from_dict(models.User, raw)
+
+    def load_all_users(self) -> List[Any]:
+        users = self._read_users()
+        return [
+            from_dict(models.User, raw)
+            for _, raw in sorted(users.items())
+        ]

@@ -1,12 +1,15 @@
 """Core data model for the Academic Assessment and Reporting Platform.
 
-Every entity is a plain dataclass that works for schools, colleges,
-universities and training institutes.  Nothing here is tied to a
-specific institution: labels such as "Class", "Semester" or "FA-1" are
+Every academic entity is a plain dataclass that works for schools,
+colleges, universities and training institutes.  Nothing here is tied to
+a specific institution: labels such as "Class", "Semester" or "FA-1" are
 just values carried by configuration, never special-cased in code.
 
-Every record carries an ``institution_id`` so the whole model maps
-cleanly onto one table per entity in a future relational database.
+Every academic record carries an ``institution_id`` so the whole model
+maps cleanly onto one table per entity in a future relational database.
+The exception is :class:`User`, which is a platform-scoped identity that
+deliberately carries no ``institution_id`` so one person can belong to
+many institutions through :class:`Membership` records.
 """
 
 from dataclasses import dataclass, field
@@ -153,6 +156,42 @@ class Mark:
     assessment_id: str
     obtained: float = 0.0
     status: str = "entered"
+
+
+# ------------------------------------------------------------
+# Identity and membership (platform level)
+# ------------------------------------------------------------
+
+
+@dataclass
+class User:
+    """A platform-scoped human identity.
+
+    ``User`` deliberately has no ``institution_id``: one person can belong
+    to many institutions.  Access to an institution is granted by a
+    :class:`Membership` carrying a role, never assumed from the user alone.
+    """
+
+    id: str
+    name: str
+    email: str = ""
+    status: str = "active"
+
+
+@dataclass
+class Membership:
+    """An institution-scoped relationship between a user and an institution.
+
+    ``role`` is one of the role constants in :mod:`assessment_engine.auth`
+    (admin, faculty, staff or student).  A user may hold different roles in
+    different institutions through separate memberships; the membership is
+    what makes the institution a tenant boundary for that user.
+    """
+
+    id: str
+    user_id: str
+    institution_id: str
+    role: str
 
 
 # ------------------------------------------------------------
