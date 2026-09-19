@@ -6,6 +6,7 @@ Commands
 - ``marks CONFIG``   record marks for one course offering interactively
 - ``import CONFIG``  bulk import marks from an Excel workbook
 - ``report CONFIG``  generate per-student Excel/PDF reports
+- ``list``           list the institutions (tenants) in a data directory
 
 Configuration files are the primary way to describe an institution; the
 interactive ``marks`` command is a fallback for data entry only.
@@ -60,6 +61,9 @@ def _build_args():
     report.add_argument("config_path")
     report.add_argument("--data", default="data", help="data directory (default: data)")
     report.add_argument("--student", default=None, help="only report this student id")
+
+    list_cmd = subparsers.add_parser("list", help="List known institutions (tenants)")
+    list_cmd.add_argument("--data", default="data", help="data directory (default: data)")
 
     return parser
 
@@ -307,6 +311,13 @@ def cmd_report(args) -> int:
     return 0
 
 
+def cmd_list(args) -> int:
+    storage = JsonStorage(args.data)
+    for institution_id in storage.list_institutions():
+        print(institution_id)
+    return 0
+
+
 def _read_int(prompt: str, minimum: int, maximum: int) -> int:
     while True:
         raw = input(prompt).strip()
@@ -332,6 +343,8 @@ def main(argv=None) -> int:
         return cmd_import(args)
     if args.command == "report":
         return cmd_report(args)
+    if args.command == "list":
+        return cmd_list(args)
 
     parser.print_help()
     return 1

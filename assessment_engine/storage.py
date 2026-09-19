@@ -68,6 +68,17 @@ class Storage(ABC):
     def clear(self, institution_id: str) -> None:
         """Remove all records for the institution."""
 
+    def list_institutions(self):
+        """Return every known institution (tenant) id, sorted.
+
+        The base implementation raises NotImplementedError so existing
+        custom storage subclasses keep working unchanged (this method is
+        deliberately non-abstract).
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support listing institutions"
+        )
+
 
 # ------------------------------------------------------------
 # Serialization helpers
@@ -210,3 +221,21 @@ class JsonStorage(Storage):
 
     def clear(self, institution_id: str) -> None:
         self._write(institution_id, {})
+
+    # --------------------------------------------------------
+    # Tenant registry
+    # --------------------------------------------------------
+
+    def list_institutions(self):
+        """Return the sorted ids of every institution in the data dir.
+
+        A directory only counts as an institution when it contains a
+        ``db.json`` file; unrelated files and directories are ignored.
+        """
+        if not self.data_dir.is_dir():
+            return []
+        institutions = []
+        for child in sorted(self.data_dir.iterdir()):
+            if child.is_dir() and (child / "db.json").is_file():
+                institutions.append(child.name)
+        return institutions
