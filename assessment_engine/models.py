@@ -348,8 +348,8 @@ class CourseResult:
     percentage: float
     grade: str
     passed: bool
+    status: str = "incomplete"
     components: List[ComponentResult] = field(default_factory=list)
-
 
 @dataclass
 class StudentResult:
@@ -368,6 +368,7 @@ class StudentResult:
     overall_percentage: float = 0.0
     grade: str = ""
     passed: bool = False
+    status: str = "incomplete"
 
     @property
     def number_of_courses(self):
