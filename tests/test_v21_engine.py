@@ -256,7 +256,7 @@ def test_absent_mark_counts_as_zero(tmp_path):
     assert maths.grade == "D"
 
 
-def test_no_marks_means_zero_everywhere(tmp_path):
+def test_no_marks_are_incomplete(tmp_path):
     config = load_config(SCHOOL_CONFIG)
     storage = JsonStorage(tmp_path / "data")
     provision_institution(config, storage)
@@ -265,9 +265,40 @@ def test_no_marks_means_zero_everywhere(tmp_path):
     results = compute_all_results(context)
 
     for result in results:
-        assert result.total_obtained == 0
-        assert result.overall_percentage == 0
-        assert result.grade == "F"
+        assert result.status == "incomplete"
+        assert result.passed is False
+        assert result.grade == ""
+
+        for course in result.course_results:
+            assert course.status == "incomplete"
+            assert course.passed is False
+            assert course.grade == ""
+
+def test_recorded_zero_is_not_incomplete(tmp_path):
+    config = load_config(SCHOOL_CONFIG)
+    storage = JsonStorage(tmp_path / "data")
+    provision_institution(config, storage)
+
+    assessments = {
+        a.name: a
+        for a in storage.load_all(models.Assessment, config.institution.id)
+        if a.offering_id == "maths_a"
+    }
+
+    record_mark(storage, config.institution.id, "s1", assessments["FA-1"].id, 0)
+    record_mark(storage, config.institution.id, "s1", assessments["FA-2"].id, 0)
+    record_mark(storage, config.institution.id, "s1", assessments["SA-1"].id, 0)
+    record_mark(storage, config.institution.id, "s1", assessments["SA-2"].id, 0)
+
+    context = make_context(config, storage)
+    student = next(s for s in context.data.students if s.id == "s1")
+    result = compute_student_result(context, student)
+
+    maths = next(c for c in result.course_results if c.course_id == "maths")
+
+    assert maths.status == "failed"
+    assert maths.passed is False
+    assert maths.percentage == pytest.approx(0)
 
 
 def test_compute_all_results_returns_one_per_student(tmp_path):
