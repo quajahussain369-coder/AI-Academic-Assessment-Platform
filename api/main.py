@@ -11,6 +11,8 @@ from assessment_engine.storage import to_dict
 from assessment_engine.storage import JsonStorage
 
 
+from api.routes.analytics import router as analytics_router
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 CONFIG_PATH = BASE_DIR / "configs" / "college.json"
@@ -23,6 +25,9 @@ app = FastAPI(
     title="QUADxy Academic Assessment API",
     version="0.1.0",
 )
+
+app.include_router(analytics_router)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
