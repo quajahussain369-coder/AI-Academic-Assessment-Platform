@@ -1,14 +1,17 @@
-"""Intelligent Import (V2.4) - Phase 1 Inspector and Phase 2 Detector.
+"""Intelligent Import (V2.4) - Inspector, Detector and Normalizer.
 
 Phase 1 (the inspector) reads an Excel workbook and describes its
 *structure*: workbook/sheet metadata, candidate header rows, per-column
 hints and data-quality observations.  Phase 2 (the detector) interprets
 that structural profile into semantic candidates - student identity,
 subjects, assessments and subject-assessment pairs - carrying evidence,
-confidence and explanation for every reading.  Both phases are
-deterministic: no external calls, no AI dependencies, no storage writes,
-no academic decisions.  Ambiguity and conflicting evidence are preserved
-for human review and never resolved silently.
+confidence and explanation for every reading.  Phase 3 (the normalizer)
+turns the detection into a canonical, deterministic representation that
+preserves raw values and full source provenance and never guesses
+ambiguous meanings.  Everything is deterministic: no external calls, no
+AI dependencies, no storage writes, no academic decisions.  Ambiguity and
+conflicting evidence are preserved for human review and never resolved
+silently.
 """
 
 from assessment_engine.intelligent_import.models import (
@@ -48,10 +51,50 @@ from assessment_engine.intelligent_import.detector import (
     detect_workbook,
     vocabulary_from_config,
 )
+from assessment_engine.intelligent_import.normalizer import (
+    ALL_VALUE_KINDS,
+    CellLocation,
+    NormalizedAssessment,
+    NormalizedField,
+    NormalizedRecord,
+    NormalizedSheet,
+    NormalizedValue,
+    Unresolved,
+    VALUE_BLANK,
+    VALUE_GRADE,
+    VALUE_IDENTIFIER,
+    VALUE_MARK,
+    VALUE_MEASURE,
+    VALUE_PERCENTAGE,
+    VALUE_RESULT,
+    VALUE_STATUS,
+    VALUE_TEXT,
+    VALUE_TOTAL,
+    VALUE_UNRESOLVED,
+    VALUE_ZERO,
+    WorkbookNormalization,
+    clean_text,
+    is_blank,
+    normalize_grade,
+    normalize_identifier,
+    normalize_mark,
+    normalize_measure,
+    normalize_percentage,
+    normalize_result,
+    normalize_sheet,
+    normalize_status,
+    normalize_text,
+    normalize_total,
+    normalize_workbook,
+    normalize_workbook_profile,
+    parse_number,
+)
 
 __all__ = [
+    "ALL_VALUE_KINDS",
     "Ambiguity",
     "AmbiguityOption",
+    "CellLocation",
     "CellRange",
     "ColumnProfile",
     "ColumnRoleCandidate",
@@ -68,17 +111,51 @@ __all__ = [
     "HeaderCandidate",
     "InspectorError",
     "LayoutHints",
+    "NormalizedAssessment",
+    "NormalizedField",
+    "NormalizedRecord",
+    "NormalizedSheet",
+    "NormalizedValue",
     "SemanticCandidate",
     "SheetProfile",
     "SheetSemantics",
     "StructuralWarning",
+    "Unresolved",
+    "VALUE_BLANK",
+    "VALUE_GRADE",
+    "VALUE_IDENTIFIER",
+    "VALUE_MARK",
+    "VALUE_MEASURE",
+    "VALUE_PERCENTAGE",
+    "VALUE_RESULT",
+    "VALUE_STATUS",
+    "VALUE_TEXT",
+    "VALUE_TOTAL",
+    "VALUE_UNRESOLVED",
+    "VALUE_ZERO",
     "Vocabulary",
     "WorkbookDetection",
+    "WorkbookNormalization",
     "WorkbookProfile",
+    "clean_text",
     "detect_sheet",
     "detect_workbook",
     "inspect_sheet",
     "inspect_workbook",
+    "is_blank",
+    "normalize_grade",
     "normalize_header_text",
+    "normalize_identifier",
+    "normalize_mark",
+    "normalize_measure",
+    "normalize_percentage",
+    "normalize_result",
+    "normalize_sheet",
+    "normalize_status",
+    "normalize_text",
+    "normalize_total",
+    "normalize_workbook",
+    "normalize_workbook_profile",
+    "parse_number",
     "vocabulary_from_config",
 ]
