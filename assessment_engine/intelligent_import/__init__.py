@@ -1,4 +1,4 @@
-"""Intelligent Import (V2.4) - Inspector, Detector and Normalizer.
+"""Intelligent Import (V2.4) - Inspector, Detector, Normalizer, Validator.
 
 Phase 1 (the inspector) reads an Excel workbook and describes its
 *structure*: workbook/sheet metadata, candidate header rows, per-column
@@ -8,10 +8,12 @@ subjects, assessments and subject-assessment pairs - carrying evidence,
 confidence and explanation for every reading.  Phase 3 (the normalizer)
 turns the detection into a canonical, deterministic representation that
 preserves raw values and full source provenance and never guesses
-ambiguous meanings.  Everything is deterministic: no external calls, no
-AI dependencies, no storage writes, no academic decisions.  Ambiguity and
-conflicting evidence are preserved for human review and never resolved
-silently.
+ambiguous meanings.  Phase 4 (the validator) validates that representation
+against deterministic, offline rules and separates errors, warnings and
+review-required conditions.  Everything is deterministic: no external
+calls, no AI dependencies, no storage writes, no academic decisions.
+Ambiguity and conflicting evidence are preserved for human review and
+never resolved silently.
 """
 
 from assessment_engine.intelligent_import.models import (
@@ -89,9 +91,26 @@ from assessment_engine.intelligent_import.normalizer import (
     normalize_workbook_profile,
     parse_number,
 )
+from assessment_engine.intelligent_import.validator import (
+    ALL_RULE_IDS,
+    ALL_SEVERITIES,
+    RecordValidation,
+    SEVERITY_ERROR,
+    SEVERITY_REVIEW,
+    SEVERITY_WARNING,
+    ValidationContext,
+    ValidationIssue,
+    ValidationResult,
+    build_validation_context,
+    validate_record,
+    validate_workbook,
+    validate_workbook_file,
+)
 
 __all__ = [
     "ALL_VALUE_KINDS",
+    "ALL_RULE_IDS",
+    "ALL_SEVERITIES",
     "Ambiguity",
     "AmbiguityOption",
     "CellLocation",
@@ -116,6 +135,10 @@ __all__ = [
     "NormalizedRecord",
     "NormalizedSheet",
     "NormalizedValue",
+    "RecordValidation",
+    "SEVERITY_ERROR",
+    "SEVERITY_REVIEW",
+    "SEVERITY_WARNING",
     "SemanticCandidate",
     "SheetProfile",
     "SheetSemantics",
@@ -133,10 +156,14 @@ __all__ = [
     "VALUE_TOTAL",
     "VALUE_UNRESOLVED",
     "VALUE_ZERO",
+    "ValidationContext",
+    "ValidationIssue",
+    "ValidationResult",
     "Vocabulary",
     "WorkbookDetection",
     "WorkbookNormalization",
     "WorkbookProfile",
+    "build_validation_context",
     "clean_text",
     "detect_sheet",
     "detect_workbook",
@@ -157,5 +184,8 @@ __all__ = [
     "normalize_workbook",
     "normalize_workbook_profile",
     "parse_number",
+    "validate_record",
+    "validate_workbook",
+    "validate_workbook_file",
     "vocabulary_from_config",
 ]
