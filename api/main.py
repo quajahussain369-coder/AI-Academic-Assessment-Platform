@@ -12,6 +12,7 @@ from assessment_engine.storage import JsonStorage
 
 
 from api.routes.analytics import router as analytics_router
+from api.routes.intelligent_import import router as intelligent_import_router
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -27,6 +28,7 @@ app = FastAPI(
 )
 
 app.include_router(analytics_router)
+app.include_router(intelligent_import_router)
 
 app.add_middleware(
     CORSMiddleware,
