@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QUADxy — Intelligent Import</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #080b10;
+            color: #f5f5f5;
+        }
+
+        .container {
+            width: min(1000px, 92%);
+            margin: 60px auto;
+        }
+
+        h1 {
+            font-size: 42px;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #9ca3af;
+            margin-bottom: 40px;
+        }
+
+        .upload-box {
+            border: 1px dashed #555;
+            border-radius: 18px;
+            padding: 50px;
+            text-align: center;
+            background: #0d1117;
+        }
+
+        input[type="file"] {
+            margin: 25px 0;
+        }
+
+        button {
+            border: 0;
+            padding: 13px 24px;
+            border-radius: 10px;
+            background: #fff;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status {
+            margin-top: 25px;
+            color: #aaa;
+        }
+
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-top: 35px;
+        }
+
+        .card {
+            background: #0d1117;
+            border: 1px solid #222;
+            border-radius: 14px;
+            padding: 20px;
+        }
+
+        .number {
+            font-size: 30px;
+            font-weight: bold;
+            margin-top: 8px;
+        }
+
+        .reviews {
+            margin-top: 30px;
+        }
+
+        .review {
+            background: #15120a;
+            border: 1px solid #4a3a12;
+            padding: 18px;
+            border-radius: 12px;
+            margin-top: 12px;
+        }
+
+        .review strong {
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        pre {
+            white-space: pre-wrap;
+            background: #05070a;
+            padding: 20px;
+            border-radius: 12px;
+            overflow-x: auto;
+        }
+
+        @media (max-width: 700px) {
+            .summary {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>Intelligent Import</h1>
+
+    <p class="subtitle">
+        Upload an academic workbook. QUADxy will inspect, detect,
+        normalize and validate the data automatically.
+    </p>
+
+    <div class="upload-box">
+
+        <h2>Upload Academic Workbook</h2>
+
+        <p>Supported formats: .xlsx, .xlsm</p>
+
+        <input id="fileInput" type="file" accept=".xlsx,.xlsm">
+
+        <br>
+
+        <button id="uploadButton">
+            Analyze Workbook
+        </button>
+
+        <div id="status" class="status"></div>
+
+    </div>
+
+    <div id="results"></div>
+
+</div>
+
+<script>
+
+const fileInput = document.getElementById("fileInput");
+const uploadButton = document.getElementById("uploadButton");
+const status = document.getElementById("status");
+const results = document.getElementById("results");
+
+uploadButton.addEventListener("click", async () => {
+
+    const file = fileInput.files[0];
+
+    if (!file) {
+        status.textContent = "Please select an Excel file.";
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    uploadButton.disabled = true;
+    status.textContent = "Analyzing workbook...";
+    results.innerHTML = "";
+
+    try {
+
+        const response = await fetch(
+            "http://127.0.0.1:8000/api/v2.4/intelligent-import/preview",
+            {
+                method: "POST",
+                body: formData
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || "Import failed.");
+        }
+
+        renderResults(data);
+
+        status.textContent = "Analysis complete.";
+
+    } catch (error) {
+
+        status.textContent = "Error: " + error.message;
+
+    } finally {
+
+        uploadButton.disabled = false;
+
+    }
+
+});
+
+
+function renderResults(data) {
+
+    results.innerHTML = `
+
+        <div class="summary">
+
+            <div class="card">
+                <div>Accepted</div>
+                <div class="number">
+                    ${data.accepted_records}
+                </div>
+            </div>
+
+            <div class="card">
+                <div>Rejected</div>
+                <div class="number">
+                    ${data.rejected_records}
+                </div>
+            </div>
+
+            <div class="card">
+                <div>Errors</div>
+                <div class="number">
+                    ${data.error_count}
+                </div>
+            </div>
+
+            <div class="card">
+                <div>Needs Review</div>
+                <div class="number">
+                    ${data.review_count}
+                </div>
+            </div>
+
+        </div>
+
+        <div class="reviews">
+
+            <h2>Review Required</h2>
+
+            ${renderReviews(data.result.issues)}
+
+        </div>
+
+        <h2>Pipeline</h2>
+
+        <pre>${data.pipeline.join(" → ")}</pre>
+
+    `;
+}
+
+
+function renderReviews(issues) {
+
+    if (!issues || issues.length === 0) {
+
+        return `
+            <div class="review">
+                No review items detected.
+            </div>
+        `;
+
+    }
+
+    return issues.map(issue => `
+
+        <div class="review">
+
+            <strong>
+                ${issue.rule_id}
+            </strong>
+
+            <div>
+                ${issue.message}
+            </div>
+
+            <br>
+
+            <small>
+                Sheet: ${issue.sheet}
+                |
+                Row: ${issue.row}
+            </small>
+
+        </div>
+
+    `).join("");
+
+}
+
+</script>
+
+</body>
+</html>

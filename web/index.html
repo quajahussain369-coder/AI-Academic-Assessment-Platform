@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>QUADxy Academic Assessment</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<header class="navbar">
+
+    <div class="logo">
+        QUAD<span>xy</span>
+    </div>
+
+    <div class="badge">
+        ACADEMIC PLATFORM
+    </div>
+
+</header>
+
+
+<main class="hero">
+
+    <!-- =========================
+         HERO
+    ========================== -->
+
+    <section class="hero-intro">
+
+        <div class="eyebrow">
+            QUADxy • ACADEMIC ASSESSMENT PLATFORM
+        </div>
+
+        <h1>
+            Turn academic data<br>
+            into <span>clear results.</span>
+        </h1>
+
+        <p class="subtitle">
+            Upload academic data, validate your workbook,
+            and transform it into structured assessment results.
+        </p>
+
+    </section>
+
+
+    <!-- =========================
+         UPLOAD
+    ========================== -->
+
+    <section class="upload-card">
+
+        <div class="upload-icon">
+            ↑
+        </div>
+
+        <h2>
+            Upload your Excel file
+        </h2>
+
+        <p>
+            Start with your V2.3 assessment workbook.
+            <br>
+            Supported formats: .xlsx, .xlsm
+        </p>
+
+
+        <label class="upload-button">
+
+            Choose Excel File
+
+            <input
+                id="fileInput"
+                type="file"
+                accept=".xlsx,.xlsm"
+                hidden
+            >
+
+        </label>
+
+
+        <div id="fileName" class="file-name"></div>
+
+
+        <div class="button-row">
+
+            <button
+                id="analyzeButton"
+                class="analyze-button"
+                disabled
+            >
+                Preview Workbook
+            </button>
+
+
+            <button
+                id="importButton"
+                class="import-button"
+                disabled
+            >
+                Import Data
+            </button>
+
+
+            <button
+                id="resultsButton"
+                class="results-button"
+            >
+                View Results
+            </button>
+
+        </div>
+
+    </section>
+
+
+    <!-- =========================
+         IMPORT / SYSTEM MESSAGE
+    ========================== -->
+
+    <section
+        id="result"
+        class="result-card hidden"
+    >
+
+        <h2>
+            Import Preview
+        </h2>
+
+        <div id="resultContent"></div>
+
+    </section>
+
+
+    <!-- =========================
+         DASHBOARD
+    ========================== -->
+
+    <section
+        id="dashboard"
+        class="dashboard hidden"
+    >
+
+        <div class="dashboard-header">
+
+            <div>
+
+                <div class="dashboard-eyebrow">
+                    ACADEMIC RESULTS
+                </div>
+
+                <h2 id="institutionName">
+                    Academic Institution
+                </h2>
+
+                <p id="academicPeriod">
+                    Academic Year • Semester
+                </p>
+
+            </div>
+
+
+            <div class="dashboard-status">
+                LIVE DATA
+            </div>
+
+        </div>
+
+
+        <!-- SUMMARY -->
+
+        <div class="summary-grid">
+
+            <div class="summary-card">
+
+                <div class="summary-label">
+                    Students
+                </div>
+
+                <div
+                    id="totalStudents"
+                    class="summary-value"
+                >
+                    0
+                </div>
+
+            </div>
+
+
+            <div class="summary-card">
+
+                <div class="summary-label">
+                    Passed
+                </div>
+
+                <div
+                    id="passedStudents"
+                    class="summary-value success-text"
+                >
+                    0
+                </div>
+
+            </div>
+
+
+            <div class="summary-card">
+
+                <div class="summary-label">
+                    Failed
+                </div>
+
+                <div
+                    id="failedStudents"
+                    class="summary-value danger-text"
+                >
+                    0
+                </div>
+
+            </div>
+
+
+            <div class="summary-card">
+
+                <div class="summary-label">
+                    Average Score
+                </div>
+
+                <div
+                    id="averageScore"
+                    class="summary-value"
+                >
+                    0%
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- STUDENT RESULTS -->
+
+        <div class="dashboard-section">
+
+            <div class="section-heading">
+
+                <div>
+
+                    <div class="section-eyebrow">
+                        OVERVIEW
+                    </div>
+
+                    <h3>
+                        Student Results
+                    </h3>
+
+                </div>
+
+                <div
+                    id="studentCountLabel"
+                    class="student-count"
+                >
+                    0 students
+                </div>
+
+            </div>
+
+
+            <div class="student-table-wrapper">
+
+                <table class="student-table">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>
+                                Roll No
+                            </th>
+
+                            <th>
+                                Student
+                            </th>
+
+                            <th>
+                                Score
+                            </th>
+
+                            <th>
+                                Grade
+                            </th>
+
+                            <th>
+                                Status
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody id="studentTableBody">
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </section>
+
+</main>
+
+
+<div id="studentDrawerOverlay" class="drawer-overlay hidden">
+    <aside id="studentDrawer" class="student-drawer">
+        <button id="closeStudentDrawer" class="drawer-close">×</button>
+
+        <div class="drawer-header">
+            <div class="drawer-eyebrow">STUDENT PROFILE</div>
+            <h2 id="drawerStudentName">Student Name</h2>
+            <p id="drawerRollNo">Roll No</p>
+        </div>
+
+        <div class="drawer-summary">
+            <div>
+                <span>Overall Score</span>
+                <strong id="drawerOverallScore">0%</strong>
+            </div>
+
+            <div>
+                <span>Grade</span>
+                <strong id="drawerGrade">-</strong>
+            </div>
+
+            <div>
+                <span>Status</span>
+                <strong id="drawerStatus">-</strong>
+            </div>
+        </div>
+
+        <div class="drawer-section">
+            <div class="drawer-section-title">SUBJECT PERFORMANCE</div>
+            <div id="drawerCourses"></div>
+        </div>
+    </aside>
+</div>
+
+<script src="app.js"></script>
+
+</body>
+</html>

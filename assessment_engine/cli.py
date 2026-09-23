@@ -6,9 +6,26 @@ Commands
 - ``marks CONFIG``   record marks for one course offering interactively
 - ``import CONFIG``  bulk import marks from an Excel workbook
 - ``report CONFIG``  generate per-student Excel/PDF reports
+- ``list``           list the institutions (tenants) in a data directory
+- ``user``           manage platform users and their institution memberships
 
 Configuration files are the primary way to describe an institution; the
 interactive ``marks`` command is a fallback for data entry only.
+
+Authorization (V2.3)
+--------------------
+The ``init``, ``marks``, ``import`` and ``report`` commands accept an
+optional ``--user USER_ID``.  When supplied the operation is checked
+against the user's membership in the target institution: the user must
+exist, be active, hold a membership there, and the membership role must
+carry the required permission.  When ``--user`` is omitted the existing
+open behaviour is preserved exactly.
+
+Note: ``provision_institution`` replaces all existing data for an
+institution, so re-running ``init`` also removes any memberships stored
+in that institution's ``db.json``.  Re-create them afterwards with the
+``user add`` command.  Bootstrap provisioning with ``--user`` only needs
+an active, known user while the institution has no memberships yet.
 """
 
 import argparse
@@ -21,6 +38,16 @@ from assessment_engine.analyzer import (
     make_context,
     provision_institution,
     record_mark,
+)
+from assessment_engine.auth import (
+    KNOWN_ROLES,
+    PERM_IMPORT,
+    PERM_MANAGE_INSTITUTION,
+    PERM_RECORD_MARKS,
+    PERM_VIEW_REPORTS,
+    AuthorizationError,
+    is_valid_role,
+    require_authorized,
 )
 from assessment_engine.config import load_config, render_template
 from assessment_engine.reports import CONSOLE_LINE, generate_reports
@@ -38,10 +65,12 @@ def _build_args():
     init = subparsers.add_parser("init", help="Provision an institution from a config file")
     init.add_argument("config_path")
     init.add_argument("--data", default="data", help="data directory (default: data)")
+    init.add_argument("--user", default=None, help="authorize as this user id (admin/manage_institution)")
 
     marks = subparsers.add_parser("marks", help="Record marks for one course offering")
     marks.add_argument("config_path")
     marks.add_argument("--data", default="data", help="data directory (default: data)")
+    marks.add_argument("--user", default=None, help="authorize as this user id (faculty/admin)")
 
     import_cmd = subparsers.add_parser("import", help="Bulk import marks from an Excel workbook")
     import_cmd.add_argument("config_path")
@@ -55,11 +84,31 @@ def _build_args():
     )
     import_cmd.add_argument("--yes", action="store_true", help="skip the confirmation prompt")
     import_cmd.add_argument("--data", default="data", help="data directory (default: data)")
+    import_cmd.add_argument("--user", default=None, help="authorize as this user id (staff/faculty/admin)")
 
     report = subparsers.add_parser("report", help="Generate per-student reports")
     report.add_argument("config_path")
     report.add_argument("--data", default="data", help="data directory (default: data)")
     report.add_argument("--student", default=None, help="only report this student id")
+    report.add_argument("--user", default=None, help="authorize as this user id (faculty/admin)")
+
+    list_cmd = subparsers.add_parser("list", help="List known institutions (tenants)")
+    list_cmd.add_argument("--data", default="data", help="data directory (default: data)")
+
+    user_cmd = subparsers.add_parser("user", help="Manage platform users and memberships")
+    user_actions = user_cmd.add_subparsers(dest="action", required=True)
+
+    user_add = user_actions.add_parser("add", help="Create or update a user (and optionally a membership)")
+    user_add.add_argument("user_id", help="user id (identifier)")
+    user_add.add_argument("--name", default=None, help="display name (defaults to the user id)")
+    user_add.add_argument("--email", default="", help="email address")
+    user_add.add_argument("--institution", default=None, help="institution to grant/update a membership in")
+    user_add.add_argument("--role", default=None, help=f"role within the institution ({'/'.join(KNOWN_ROLES)})")
+    user_add.add_argument("--data", default="data", help="data directory (default: data)")
+
+    user_list = user_actions.add_parser("list", help="List platform users or members of one institution")
+    user_list.add_argument("--institution", default=None, help="show memberships of this institution only")
+    user_list.add_argument("--data", default="data", help="data directory (default: data)")
 
     return parser
 
@@ -71,9 +120,51 @@ def _storage(data_dir, config):
     return storage
 
 
+def _authorize_or_report(
+    storage, args, institution_id: str, permission: str, *, bootstrap: bool = False
+) -> bool:
+    """Authorize an optional ``--user`` against their membership.
+
+    When ``--user`` is absent the caller keeps its existing behaviour
+    (returns True).  When present, the user must exist, be active, hold
+    a membership in the institution and the membership role must carry
+    ``permission``.  ``bootstrap`` allows ``init`` on an institution that
+    has no memberships yet (it cannot exist before the institution does).
+    Prints the reason and returns False on any failure.
+    """
+    user_id = getattr(args, "user", None)
+    if not user_id:
+        return True
+
+    user = storage.load_user(user_id)
+    if user is None:
+        print(f"Access denied: unknown user '{user_id}'.")
+        return False
+    if user.status != "active":
+        print(f"Access denied: user '{user_id}' is not active.")
+        return False
+
+    memberships = storage.load_all(models.Membership, institution_id)
+    if bootstrap and not memberships:
+        return True
+
+    try:
+        require_authorized(memberships, user_id, institution_id, permission)
+    except AuthorizationError as exc:
+        print(f"Access denied: {exc}")
+        return False
+    return True
+
+
 def cmd_init(args) -> int:
     config = load_config(args.config_path)
     storage = JsonStorage(args.data)
+
+    if not _authorize_or_report(
+        storage, args, config.institution.id, PERM_MANAGE_INSTITUTION, bootstrap=True
+    ):
+        return 3
+
     count = provision_institution(config, storage)
 
     print(CONSOLE_LINE)
@@ -93,6 +184,13 @@ def cmd_init(args) -> int:
 
 def cmd_marks(args) -> int:
     config = load_config(args.config_path)
+    storage = JsonStorage(args.data)
+
+    if not _authorize_or_report(
+        storage, args, config.institution.id, PERM_RECORD_MARKS
+    ):
+        return 3
+
     storage = _storage(args.data, config)
     institution_id = config.institution.id
 
@@ -196,6 +294,11 @@ def cmd_marks(args) -> int:
 
 def cmd_import(args) -> int:
     config = load_config(args.config_path)
+    storage = JsonStorage(args.data)
+
+    if not _authorize_or_report(storage, args, config.institution.id, PERM_IMPORT):
+        return 3
+
     storage = _storage(args.data, config)
 
     if args.template:
@@ -276,6 +379,13 @@ def cmd_import(args) -> int:
 
 def cmd_report(args) -> int:
     config = load_config(args.config_path)
+    storage = JsonStorage(args.data)
+
+    if not _authorize_or_report(
+        storage, args, config.institution.id, PERM_VIEW_REPORTS
+    ):
+        return 3
+
     storage = _storage(args.data, config)
     context = make_context(config, storage)
 
@@ -307,6 +417,128 @@ def cmd_report(args) -> int:
     return 0
 
 
+def cmd_list(args) -> int:
+    storage = JsonStorage(args.data)
+    for institution_id in storage.list_institutions():
+        print(institution_id)
+    return 0
+
+
+def cmd_user(args) -> int:
+    if args.action == "add":
+        return cmd_user_add(args)
+    return cmd_user_list(args)
+
+
+def cmd_user_add(args) -> int:
+    storage = JsonStorage(args.data)
+    user_id = args.user_id
+
+    existing = storage.load_user(user_id)
+    user = models.User(
+        id=user_id,
+        name=args.name or (existing.name if existing else user_id),
+        email=args.email if args.email else (existing.email if existing else ""),
+        status=existing.status if existing else "active",
+    )
+    storage.save_user(user)
+    created = existing is None
+
+    if not args.institution:
+        print(CONSOLE_LINE)
+        print(f"User '{user_id}' {'created' if created else 'updated'} ({user.name}).")
+        return 0
+
+    if not args.role:
+        print("user add --institution requires --role.")
+        return 2
+
+    if not is_valid_role(args.role):
+        valid = ", ".join(KNOWN_ROLES)
+        print(f"Unknown role '{args.role}'. Valid roles: {valid}.")
+        return 2
+
+    institution = storage.load(
+        models.Institution, args.institution, args.institution
+    )
+    if institution is None:
+        print(f"Unknown institution '{args.institution}'. Run 'init' first.")
+        return 3
+
+    memberships = storage.load_all(models.Membership, args.institution)
+    membership = next(
+        (item for item in memberships if item.user_id == user_id), None
+    )
+    if membership is None:
+        membership = models.Membership(
+            id=f"mem_{user_id}_{args.institution}",
+            user_id=user_id,
+            institution_id=args.institution,
+            role=args.role,
+        )
+    else:
+        membership.role = args.role
+    storage.save(membership)
+
+    print(CONSOLE_LINE)
+    print(f"User '{user_id}' ({user.name})")
+    print(f"Membership : {args.institution} as {args.role}")
+    return 0
+
+
+def cmd_user_list(args) -> int:
+    storage = JsonStorage(args.data)
+
+    if not args.institution:
+        users = storage.load_all_users()
+        print(CONSOLE_LINE)
+        print(f"Platform users ({len(users)})")
+        print(CONSOLE_LINE)
+        _print_table(
+            ("User ID", "Name", "Email", "Status"),
+            [(user.id, user.name, user.email, user.status) for user in users],
+        )
+        return 0
+
+    institution = storage.load(
+        models.Institution, args.institution, args.institution
+    )
+    if institution is None:
+        print(f"Unknown institution '{args.institution}'.")
+        return 3
+
+    memberships = storage.load_all(models.Membership, args.institution)
+    users = {user.id: user for user in storage.load_all_users()}
+    rows = []
+    for membership in memberships:
+        user = users.get(membership.user_id)
+        name = user.name if user else "-"
+        rows.append((membership.user_id, name, membership.role))
+    rows.sort(key=lambda row: row[0])
+
+    print(CONSOLE_LINE)
+    print(f"Members of '{args.institution}' ({len(rows)})")
+    print(CONSOLE_LINE)
+    _print_table(("User ID", "Name", "Role"), rows)
+    return 0
+
+
+def _print_table(header, rows) -> None:
+    widths = [len(str(item)) for item in header]
+    for row in rows:
+        for index, value in enumerate(row):
+            widths[index] = max(widths[index], len(str(value)))
+
+    def fmt(row):
+        return "  ".join(
+            str(value).ljust(widths[index]) for index, value in enumerate(row)
+        ).rstrip()
+
+    print(fmt(header))
+    for row in rows:
+        print(fmt(row))
+
+
 def _read_int(prompt: str, minimum: int, maximum: int) -> int:
     while True:
         raw = input(prompt).strip()
@@ -332,6 +564,10 @@ def main(argv=None) -> int:
         return cmd_import(args)
     if args.command == "report":
         return cmd_report(args)
+    if args.command == "list":
+        return cmd_list(args)
+    if args.command == "user":
+        return cmd_user(args)
 
     parser.print_help()
     return 1

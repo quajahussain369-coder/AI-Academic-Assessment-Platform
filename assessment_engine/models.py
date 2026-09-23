@@ -1,12 +1,15 @@
 """Core data model for the Academic Assessment and Reporting Platform.
 
-Every entity is a plain dataclass that works for schools, colleges,
-universities and training institutes.  Nothing here is tied to a
-specific institution: labels such as "Class", "Semester" or "FA-1" are
+Every academic entity is a plain dataclass that works for schools,
+colleges, universities and training institutes.  Nothing here is tied to
+a specific institution: labels such as "Class", "Semester" or "FA-1" are
 just values carried by configuration, never special-cased in code.
 
-Every record carries an ``institution_id`` so the whole model maps
-cleanly onto one table per entity in a future relational database.
+Every academic record carries an ``institution_id`` so the whole model
+maps cleanly onto one table per entity in a future relational database.
+The exception is :class:`User`, which is a platform-scoped identity that
+deliberately carries no ``institution_id`` so one person can belong to
+many institutions through :class:`Membership` records.
 """
 
 from dataclasses import dataclass, field
@@ -15,7 +18,17 @@ from typing import Any, Dict, List, Optional
 
 @dataclass
 class Institution:
-    """One school, college, university or training institute."""
+    """One school, college, university or training institute.
+
+    ``id`` is the immutable internal tenant id and the storage key; it is
+    never used as a human-facing identifier.  ``code`` is the optional
+    human-facing institution code (e.g. "KEC"), unique platform-wide,
+    compared case-insensitively after whitespace trimming and stored
+    normalized to uppercase.  ``status`` marks the institution active or
+    inactive.  ``organization_id`` optionally binds the institution to a
+    platform-scoped :class:`Organization`; institutions without one are
+    standalone.
+    """
 
     id: str
     name: str
@@ -23,6 +36,9 @@ class Institution:
     institution_type: str = ""
     default_grade_scale_id: str = "default"
     default_rule_set_id: str = "default"
+    code: str = ""
+    status: str = "active"
+    organization_id: Optional[str] = None
 
 
 @dataclass
@@ -156,6 +172,71 @@ class Mark:
 
 
 # ------------------------------------------------------------
+# Identity and membership (platform level)
+# ------------------------------------------------------------
+
+
+@dataclass
+class Organization:
+    """A platform-scoped education group that controls institutions.
+
+    Schools, colleges and universities are *not* separate entity types:
+    they are :class:`Institution` records whose ``institution_type``
+    names the kind, and an ``Organization`` is simply the group above
+    them.  One organization may manage many institutions (each
+    ``Institution.organization_id`` points here); ``parent_id`` lets an
+    organization belong to another organization, building a plain tree.
+    Organizations are stored platform-wide in ``organizations.json``,
+    next to platform users.
+    """
+
+    id: str
+    name: str
+    code: str = ""
+    status: str = "active"
+    parent_id: Optional[str] = None
+
+
+@dataclass
+class User:
+    """A platform-scoped human identity.
+
+    ``User`` deliberately has no ``institution_id``: one person can belong
+    to many institutions.  Access to an institution is granted by a
+    :class:`Membership` carrying a role, never assumed from the user alone.
+    """
+
+    id: str
+    name: str
+    email: str = ""
+    status: str = "active"
+
+
+@dataclass
+class Membership:
+    """An institution-scoped relationship between a user and an institution.
+
+    ``role`` is one of the role constants in :mod:`assessment_engine.auth`
+    (admin, faculty, staff or student).  A user may hold different roles in
+    different institutions through separate memberships; the membership is
+    what makes the institution a tenant boundary for that user.
+
+    ``username`` is the optional human-facing login alias for this user
+    within this institution (e.g. "KEC-ADM-0001").  It is scoped to the
+    institution: the same username may exist in another institution, and
+    uniqueness is only enforced inside one institution.  ``User.id`` always
+    remains the canonical identity - the username is purely a lookup alias
+    and is never used as database identity.
+    """
+
+    id: str
+    user_id: str
+    institution_id: str
+    role: str
+    username: str = ""
+
+
+# ------------------------------------------------------------
 # Configuration-side models
 # ------------------------------------------------------------
 
@@ -267,8 +348,8 @@ class CourseResult:
     percentage: float
     grade: str
     passed: bool
+    status: str = "incomplete"
     components: List[ComponentResult] = field(default_factory=list)
-
 
 @dataclass
 class StudentResult:
@@ -287,6 +368,7 @@ class StudentResult:
     overall_percentage: float = 0.0
     grade: str = ""
     passed: bool = False
+    status: str = "incomplete"
 
     @property
     def number_of_courses(self):

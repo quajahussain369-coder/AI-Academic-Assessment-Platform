@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QUADxy Academic Assessment</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <header class="navbar">
+        <div class="logo">QUAD<span>xy</span></div>
+        <div class="badge">ACADEMIC BETA</div>
+    </header>
+
+    <main class="hero">
+
+        <div class="eyebrow">QUADxy • ACADEMIC ASSESSMENT PLATFORM</div>
+
+        <h1>
+            Turn academic data<br>
+            into <span>clear results.</span>
+        </h1>
+
+        <p class="subtitle">
+            Upload your academic Excel file, validate the data,
+            and transform it into structured assessment results.
+        </p>
+
+        <section class="upload-card">
+
+            <div class="upload-icon">↑</div>
+
+            <h2>Upload your Excel file</h2>
+
+            <p>
+                Start with your V2.3 assessment workbook.
+                <br>
+                Supported formats: .xlsx, .xlsm
+            </p>
+
+            <label class="upload-button">
+                Choose Excel File
+                <input id="fileInput" type="file"
+                       accept=".xlsx,.xlsm" hidden>
+            </label>
+
+            <div id="fileName" class="file-name"></div>
+
+            <div class="button-row">
+    <button id="analyzeButton" class="analyze-button" disabled>
+        Preview Workbook
+    </button>
+
+    <button id="importButton" class="import-button" disabled>
+        Import Data
+    </button>
+
+    <button id="resultsButton" class="results-button">
+        View Results
+    </button>
+</div>
+        </section>
+
+        <section id="result" class="result-card hidden">
+            <h2>Import Preview</h2>
+            <div id="resultContent"></div>
+        </section>
+
+    </main>
+
+    <script src="app.js"></script>
+
+</body>
+</html>

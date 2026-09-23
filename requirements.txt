@@ -8,3 +8,5 @@ reportlab>=5.0.1
 
 # Development / test dependency (required to run the unit tests).
 pytest>=9.1.1
+fastapi
+uvicorn[standard]

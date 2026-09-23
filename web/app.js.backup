@@ -1,0 +1,266 @@
+const fileInput = document.getElementById("fileInput");
+const fileName = document.getElementById("fileName");
+const analyzeButton = document.getElementById("analyzeButton");
+const importButton = document.getElementById("importButton");
+const result = document.getElementById("result");
+const resultContent = document.getElementById("resultContent");
+const resultsButton = document.getElementById("resultsButton");
+
+let selectedFile = null;
+let previewValid = false;
+
+fileInput.addEventListener("change", () => {
+    selectedFile = fileInput.files[0] || null;
+    previewValid = false;
+
+    if (!selectedFile) {
+        fileName.textContent = "";
+        analyzeButton.disabled = true;
+        importButton.disabled = true;
+        return;
+    }
+
+    fileName.textContent = `Selected: ${selectedFile.name}`;
+    analyzeButton.disabled = false;
+    importButton.disabled = true;
+});
+
+analyzeButton.addEventListener("click", async () => {
+    if (!selectedFile) return;
+
+    analyzeButton.disabled = true;
+    analyzeButton.textContent = "Analyzing...";
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+
+    try {
+        const response = await fetch(
+            "http://127.0.0.1:8000/api/academic/import/preview",
+            {
+                method: "POST",
+                body: formData
+            }
+        );
+
+        const data = await response.json();
+
+        result.classList.remove("hidden");
+
+        if (!response.ok) {
+            throw new Error(data.detail || "Preview failed.");
+        }
+
+        if (data.valid) {
+            previewValid = true;
+            importButton.disabled = false;
+
+            resultContent.innerHTML = `
+                <div class="success">
+                    ✓ Workbook validated successfully
+                </div>
+
+                <div class="stat">
+                    <span>Students to create</span>
+                    <strong>${data.students_to_create}</strong>
+                </div>
+
+                <div class="stat">
+                    <span>Enrollments</span>
+                    <strong>${data.enrollments}</strong>
+                </div>
+
+                <div class="stat">
+                    <span>Marks detected</span>
+                    <strong>${data.marks}</strong>
+                </div>
+
+                <p style="margin-top:20px;color:#999;">
+                    The workbook is ready to import.
+                </p>
+            `;
+        } else {
+            previewValid = false;
+            importButton.disabled = true;
+
+            resultContent.innerHTML = `
+                <div class="error">
+                    ✕ Validation failed
+                </div>
+
+                <p style="margin-top:15px;">
+                    ${data.errors.map(error =>
+                        `${error.sheet}: ${error.message}`
+                    ).join("<br>")}
+                </p>
+            `;
+        }
+
+    } catch (error) {
+        previewValid = false;
+        importButton.disabled = true;
+
+        result.classList.remove("hidden");
+
+        resultContent.innerHTML = `
+            <div class="error">
+                Could not connect to the Academic API.
+            </div>
+
+            <p style="margin-top:15px;color:#999;">
+                ${error.message}
+            </p>
+        `;
+    }
+
+    analyzeButton.disabled = false;
+    analyzeButton.textContent = "Preview Workbook";
+});
+
+importButton.addEventListener("click", async () => {
+    if (!selectedFile || !previewValid) return;
+
+    importButton.disabled = true;
+    analyzeButton.disabled = true;
+    importButton.textContent = "Importing...";
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+
+    try {
+        const response = await fetch(
+            "http://127.0.0.1:8000/api/academic/import",
+            {
+                method: "POST",
+                body: formData
+            }
+        );
+
+        const data = await response.json();
+
+        result.classList.remove("hidden");
+
+        if (!response.ok) {
+            throw new Error(
+                data.detail?.message ||
+                data.detail ||
+                "Import failed."
+            );
+        }
+
+        resultContent.innerHTML = `
+            <div class="success">
+                ✓ Data imported successfully
+            </div>
+
+            <div class="stat">
+                <span>Students created</span>
+                <strong>${data.students_created}</strong>
+            </div>
+
+            <div class="stat">
+                <span>Enrollments created</span>
+                <strong>${data.enrollments_created}</strong>
+            </div>
+
+            <div class="stat">
+                <span>Marks imported</span>
+                <strong>${data.marks_imported}</strong>
+            </div>
+
+            <p style="margin-top:20px;color:#999;">
+                Your academic data is now stored in QUADxy.
+            </p>
+        `;
+
+    } catch (error) {
+        resultContent.innerHTML = `
+            <div class="error">
+                ✕ Import failed
+            </div>
+
+            <p style="margin-top:15px;color:#999;">
+                ${error.message}
+            </p>
+        `;
+    }
+
+    importButton.disabled = false;
+    analyzeButton.disabled = false;
+    importButton.textContent = "Import Data";
+});
+resultsButton.addEventListener("click", async () => {
+    resultsButton.disabled = true;
+    resultsButton.textContent = "Loading...";
+
+    try {
+        const response = await fetch(
+            "http://127.0.0.1:8000/api/academic/results"
+        );
+
+        const data = await response.json();
+
+        result.classList.remove("hidden");
+
+        if (!response.ok) {
+            throw new Error(data.detail || "Could not load results.");
+        }
+
+        resultContent.innerHTML = `
+            <div class="success">
+                ✓ Academic results loaded
+            </div>
+
+            <h3 style="margin-top:25px;">
+                ${data.institution}
+            </h3>
+
+            ${data.results.map(student => `
+                <div class="student-result">
+                    <h3>
+                        ${student.student_name}
+                        <span>${student.roll_no}</span>
+                    </h3>
+
+                    <p>
+                        Overall:
+                        <strong>${student.overall_percentage}%</strong>
+                        &nbsp; | &nbsp;
+                        Grade:
+                        <strong>${student.grade}</strong>
+                        &nbsp; | &nbsp;
+                        ${student.passed ? "✓ Passed" : "✕ Failed"}
+                    </p>
+
+                    <div class="course-results">
+                        ${student.course_results.map(course => `
+                            <div class="course-result">
+                                <strong>${course.course_name}</strong>
+                                <span>
+                                    ${course.percentage}%
+                                    · ${course.grade}
+                                </span>
+                            </div>
+                        `).join("")}
+                    </div>
+                </div>
+            `).join("")}
+        `;
+
+    } catch (error) {
+        result.classList.remove("hidden");
+
+        resultContent.innerHTML = `
+            <div class="error">
+                ✕ Could not load results
+            </div>
+
+            <p style="margin-top:15px;color:#999;">
+                ${error.message}
+            </p>
+        `;
+    }
+
+    resultsButton.disabled = false;
+    resultsButton.textContent = "View Results";
+});

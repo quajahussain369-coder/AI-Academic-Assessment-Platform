@@ -286,10 +286,6 @@ def _assessments_by_offering(
 def compute_student_result(
     context: ResultContext, student: models.Student
 ) -> Optional[models.StudentResult]:
-    """Compute the full result for one student.
-
-    Returns None when the student has no enrollment in the period.
-    """
     data = context.data
 
     enrollment = next(
@@ -309,12 +305,18 @@ def compute_student_result(
 
     institution_name = context.config.institution.name
 
-    year_name = years_by_id.get(enrollment.year_id).name if enrollment.year_id in years_by_id else ""
+    year_name = (
+        years_by_id.get(enrollment.year_id).name
+        if enrollment.year_id in years_by_id
+        else ""
+    )
+
     term_name = ""
     if enrollment.term_id and enrollment.term_id in terms_by_id:
         term_name = terms_by_id[enrollment.term_id].name
 
     course_results = []
+
     for offering_id in enrollment.course_ids:
         offering = offerings_by_id.get(offering_id)
         if offering is None:
@@ -326,26 +328,64 @@ def compute_student_result(
 
         course_results.append(
             _compute_course_result(
-                context, student.id, offering, course_name, course_code,
+                context,
+                student.id,
+                offering,
+                course_name,
+                course_code,
                 assessments_by_offering.get(offering.id, []),
                 marks_map,
             )
         )
 
     decimals = _decimals_for(context)
-    total_obtained = round(sum(item.obtained for item in course_results), decimals)
-    total_maximum = round(sum(item.maximum for item in course_results), decimals)
+
+    total_obtained = round(
+        sum(item.obtained for item in course_results),
+        decimals,
+    )
+
+    total_maximum = round(
+        sum(item.maximum for item in course_results),
+        decimals,
+    )
 
     overall_percentage = 0.0
-    if total_maximum > 0:
-        overall_percentage = round(total_obtained / total_maximum * 100, decimals)
 
-    rule_set = rule_set_for(context.config.rule_sets, data.institution)
-    scale = grade_scale_for(
-        context.config.grade_scales, context.config.rule_sets, data.institution
+    if total_maximum > 0:
+        overall_percentage = round(
+            total_obtained / total_maximum * 100,
+            decimals,
+        )
+
+    rule_set = rule_set_for(
+        context.config.rule_sets,
+        data.institution,
     )
-    grade = scale.grade_for(overall_percentage) if scale else ""
-    passed = is_student_passed(rule_set, overall_percentage, course_results)
+
+    scale = grade_scale_for(
+        context.config.grade_scales,
+        context.config.rule_sets,
+        data.institution,
+    )
+
+    has_incomplete_course = any(
+        course.status == "incomplete"
+        for course in course_results
+    )
+
+    if has_incomplete_course:
+        grade = ""
+        passed = False
+        status = "incomplete"
+    else:
+        grade = scale.grade_for(overall_percentage) if scale else ""
+        passed = is_student_passed(
+            rule_set,
+            overall_percentage,
+            course_results,
+        )
+        status = "passed" if passed else "failed"
 
     return models.StudentResult(
         student_id=student.id,
@@ -354,16 +394,22 @@ def compute_student_result(
         institution_name=institution_name,
         year_name=year_name,
         term_name=term_name,
-        org_path=build_org_path(org_units_by_id, enrollment.org_unit_id),
+        org_path=build_org_path(
+            org_units_by_id,
+            enrollment.org_unit_id,
+        ),
         course_results=course_results,
         total_obtained=total_obtained,
         total_maximum=total_maximum,
         overall_percentage=overall_percentage,
         grade=grade,
         passed=passed,
+        status=status,
     )
 
 
+
+	
 def _compute_course_result(
     context: ResultContext,
     student_id: str,
@@ -377,10 +423,19 @@ def _compute_course_result(
     decimals = _decimals_for(context)
 
     components = []
+    all_marks_present = True
+
     for assessment in offering_assessments:
         mark = marks_map.get((student_id, assessment.id))
-        obtained = 0.0
-        if mark is not None and mark.status == "entered":
+
+        if mark is None:
+            all_marks_present = False
+            obtained = 0.0
+        elif mark.status == "entered":
+            obtained = mark.obtained
+        else:
+            # A recorded non-entered status such as "absent"
+            # is still a recorded academic outcome.
             obtained = mark.obtained
 
         percentage = 0.0
@@ -399,22 +454,49 @@ def _compute_course_result(
             )
         )
 
-    rule_set = rule_set_for(context.config.rule_sets, data.institution, offering)
-    scale = grade_scale_for(
-        context.config.grade_scales, context.config.rule_sets, data.institution, offering
+    rule_set = rule_set_for(
+        context.config.rule_sets,
+        data.institution,
+        offering,
     )
 
-    course_percentage = compute_course_percentage(components, rule_set.aggregation) if rule_set else 0.0
-    course_percentage = round(course_percentage, decimals)
+    scale = grade_scale_for(
+        context.config.grade_scales,
+        context.config.rule_sets,
+        data.institution,
+        offering,
+    )
 
-    grade = scale.grade_for(course_percentage) if scale else ""
-    passed = is_course_passed(rule_set, course_percentage)
+    if all_marks_present and components:
+        course_percentage = (
+            compute_course_percentage(components, rule_set.aggregation)
+            if rule_set
+            else 0.0
+        )
+        course_percentage = round(course_percentage, decimals)
+
+        grade = scale.grade_for(course_percentage) if scale else ""
+        passed = is_course_passed(rule_set, course_percentage)
+        status = "passed" if passed else "failed"
+    else:
+        course_percentage = 0.0
+        grade = ""
+        passed = False
+        status = "incomplete"
 
     maximum = offering.max_marks or 100
-    obtained = round(course_percentage / 100 * maximum, decimals)
+    obtained = round(
+        course_percentage / 100 * maximum,
+        decimals,
+    )
 
-    for component in components:
-        component.grade = scale.grade_for(component.percentage) if scale else ""
+    if all_marks_present:
+        for component in components:
+            component.grade = (
+                scale.grade_for(component.percentage)
+                if scale
+                else ""
+            )
 
     return models.CourseResult(
         offering_id=offering.id,
@@ -426,6 +508,7 @@ def _compute_course_result(
         percentage=course_percentage,
         grade=grade,
         passed=passed,
+        status=status,
         components=components,
     )
 
